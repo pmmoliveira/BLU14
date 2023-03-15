@@ -11,29 +11,26 @@ from peewee import (
 from playhouse.shortcuts import model_to_dict
 from playhouse.db_url import connect
 
+#####
+# Data import
+df = pd.read_csv("bank.csv")
 
-########################################
-# Begin database stuff
+#####
+def get_valid_categories(df, column):
+    """
+    Obtain list of available categories for column
+    
+    Inputs:
+        df (pandas.DataFrame): dataframe from which to extract column values
+        column (str): target column for which to extract values
+    
+    Returns:
+        categories: A list of potential values for column
+    """
+    categories = list(df[column].unique())
 
-# The connect function checks if there is a DATABASE_URL env var.
-# If it exists, it uses it to connect to a remote postgres db.
-# Otherwise, it connects to a local sqlite db stored in predictions.db.
-DB = connect(os.environ.get('DATABASE_URL') or 'sqlite:///predictions.db')
+    return categories
 
-class Prediction(Model):
-    observation_id = IntegerField(unique=True)
-    observation = TextField()
-    proba = FloatField()
-    true_class = IntegerField(null=True)
-
-    class Meta:
-        database = DB
-
-
-DB.create_tables([Prediction], safe=True)
-
-# End database stuff
-########################################
 
 ########################################
 # Unpickle the previously-trained model
@@ -60,49 +57,72 @@ app = Flask(__name__)
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    obs_dict = request.get_json()
-    _id = obs_dict['id']
-    observation = obs_dict['observation']
-    try:
-        obs = pd.DataFrame([observation], columns=columns).astype(dtypes)
-        proba = pipeline.predict_proba(obs)[0, 1]
-        response = {'proba': proba}
-        p = Prediction(
-            observation_id=_id,
-            proba=proba,
-            observation=observation
-        )
-        p.save()
-    except IntegrityError:
-        error_msg = 'Observation ID: "{}" already exists'.format(_id)
-        response['error'] = error_msg
-        print(error_msg)
-        DB.rollback()
-    except ValueError:
-        error_msg = 'Observation is invalid!'
-        response = {'error': error_msg}
-        print(error_msg)
+    #obs_dict = request.get_json()
+    request = request.get_json()
+    base_dict_keys = ['observation_id', 'data']
+    data_dict_keys = ['age','workclass','sex','race','education','marital-status', 'capital-gain', 
+                      'capital-loss', 'hours-per-week']
+    category_columns = ['workclass','sex','race','education','marital-status']
+    numeric_colums = ['age', 'capital-gain', 'capital-loss', 'hours-per-week']
+    if list(request.keys())[0] != base_dict_keys[0]:
+        return jsonify({
+                "observation_id": None,
+                "error": "Missing observation_id"
+                    })
+    if list(request.keys())[1] != base_dict_keys[1]:
+        return jsonify({
+                "observation_id": None,
+                "error": "Missing data"
+                    })
+    for key in data_dict_keys:
+        if key not in list(request['data'].keys()):
+            return jsonify({
+                "observation_id": request['observation_id'],
+                "error": "Missing " + key
+                    })
+    for key in list(request['data'].keys()):
+        if key not in data_dict_keys:
+            return jsonify({
+                "observation_id": request['observation_id'],
+                "error": key + ' not recognized'
+                    })
+    for cat in category_columns:
+        if request['data'][cat] not in get_valid_categories(df, cat):
+            return jsonify({
+                    "observation_id": request['observation_id'],
+                    "error": request['data'][cat] + " incorrect value for " + cat
+                    })
+    for cat in numeric_colums:
+        if (request['data'][cat] > df[cat].max()) or (request['data'][cat] < df[cat].min()):
+            return jsonify({
+                    "observation_id": request['observation_id'],
+                    "error": str(request['data'][cat]) + " incorrect value for " + cat
+                    })
+    
+    #### Prediction
+    pred_prob = pipeline.predict_proba(pd.DataFrame([{
+            "age": request['data']['age'], 
+            "workclass": request['data']['workclass'], 
+            "education": request['data']['education'], 
+            "marital-status": request['data']['marital-status'], 
+            "race": request['data']['race'],
+            "sex": request['data']['sex'],
+            "capital-gain": request['data']['capital-gain'], 
+            "capital-loss": request['data']['capital-loss'], 
+            "hours-per-week": request['data']['hours-per-week']}
+        ], columns=columns).astype(dtypes))[0][1]
+    
+    if pred_prob > 0.5:
+        pred = True
+    else:
+        pred = False
+    response = {
+                "observation_id": request['observation_id'],
+                "prediction": pred,
+                "probability": pred_prob
+            }
+    
     return jsonify(response)
-
-
-@app.route('/update', methods=['POST'])
-def update():
-    obs = request.get_json()
-    try:
-        p = Prediction.get(Prediction.observation_id == obs['id'])
-        p.true_class = obs['true_class']
-        p.save()
-        return jsonify(model_to_dict(p))
-    except Prediction.DoesNotExist:
-        error_msg = 'Observation ID: "{}" does not exist'.format(obs['id'])
-        return jsonify({'error': error_msg})
-
-
-@app.route('/list-db-contents')
-def list_db_contents():
-    return jsonify([
-        model_to_dict(obs) for obs in Prediction.select()
-    ])
 
 
 # End webserver stuff
