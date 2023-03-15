@@ -17,19 +17,19 @@ from playhouse.db_url import connect
 
 #####
 #def get_valid_categories(df, column):
-    """
-    Obtain list of available categories for column
-    
-    Inputs:
-        df (pandas.DataFrame): dataframe from which to extract column values
-        column (str): target column for which to extract values
-    
-    Returns:
-        categories: A list of potential values for column
-    """
- #   categories = list(df[column].unique())
+#    """
+#    Obtain list of available categories for column
+#    
+#    Inputs:
+#        df (pandas.DataFrame): dataframe from which to extract column values
+#        column (str): target column for which to extract values
+#    
+#    Returns:
+#        categories: A list of potential values for column
+#    """
+#    categories = list(df[column].unique())
 
- #   return categories
+#    return categories
 
 
 ########################################
