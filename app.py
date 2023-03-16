@@ -3,6 +3,7 @@ import json
 import pickle
 import joblib
 import pandas as pd
+from uuid import uuid4
 from flask import Flask, jsonify, request
 from peewee import (
     Model, IntegerField, FloatField,
