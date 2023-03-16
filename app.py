@@ -60,7 +60,8 @@ app = Flask(__name__)
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    obs_dict = request.get_json()
+    #obs_dict = request.get_json()
+    obs_dict = request.json
     response = obs_dict
     #_id = obs_dict['id']
     #observation = obs_dict['observation']
