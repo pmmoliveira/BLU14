@@ -61,13 +61,13 @@ app = Flask(__name__)
 @app.route('/predict', methods=['POST'])
 def predict():
     obs_dict = request.get_json()
+    response = obs_dict
     #_id = obs_dict['id']
     #observation = obs_dict['observation']
     #try:
     #    obs = pd.DataFrame([observation], columns=columns).astype(dtypes)
     #    proba = pipeline.predict_proba(obs)[0, 1]
     #    response = {'proba': proba}
-        response = obs_dict
     #    p = Prediction(
     #        observation_id=_id,
     #        proba=proba,
